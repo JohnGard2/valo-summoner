@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Valo Summoner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl">
+    
+    <!-- ส่วนหัวและปุ่มล็อกอิน -->
+    <div class="flex justify-between items-center border-b border-slate-800 pb-4">
+      <div>
+        <h1 class="text-xl font-bold tracking-wider text-rose-500 uppercase">Valo Summoner</h1>
+        <p class="text-xs text-slate-400">ระบบเรียกเพื่อนเข้าห้องตี้</p>
+      </div>
+      <button id="authBtn" onclick="handleAuth()" class="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 transition">
+        <span>🔑 ล็อกอิน Discord</span>
+      </button>
+    </div>
+
+    <!-- รายชื่อเพื่อน -->
+    <div>
+      <div class="flex justify-between items-center mb-2">
+        <label class="text-xs font-semibold uppercase text-slate-400">เลือกเพื่อนที่ต้องการเรียก</label>
+        <button onclick="loadProfiles()" class="text-xs text-rose-400 hover:underline">รีเฟรช</button>
+      </div>
+      <div id="friendList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+        <p class="text-xs text-slate-500">กำลังโหลดรายชื่อ...</p>
+      </div>
+    </div>
+
+    <!-- กล่องกรอกข้อมูล -->
+    <div class="space-y-3">
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">ข้อความแจ้งเตือน</label>
+        <input id="customMsg" type="text" value="ลงแรงค์ด่วน ขาด 1 คน!" placeholder="ข้อความแจ้งเตือน" 
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:border-rose-500 outline-none">
+      </div>
+      <div>
+        <label class="block text-xs text-slate-400 mb-1">Join Code หรือ ลิงก์ห้อง Valorant</label>
+        <input id="joinCode" type="text" placeholder="เช่น YHDZ-vvd6-0z2s หรือ วางลิงก์เต็ม" 
+          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono text-slate-200 focus:border-rose-500 outline-none">
+      </div>
+    </div>
+
+    <!-- ปุ่มยิงสัญญาณ -->
+    <button onclick="sendSummon()" class="w-full py-3 bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-bold rounded-xl text-sm transition shadow-lg shadow-rose-950">
+      ยิงสัญญาณเรียกเพื่อน
+    </button>
+  </div>
+
+  <script>
+    const SUPABASE_URL = "https://qjwujhoobdneahxrpexb.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_Ik19jiEPLwHgd_gnuVP-fw_LwnkUrSp"; // <<-- นำ Anon Key จาก Supabase มาใส่ตรงนี้
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let currentUser = null;
+    const channel = supabase.channel('room:summon');
+    channel.subscribe();
+
+    async function handleAuth() {
+      if (currentUser) {
+        await supabase.auth.signOut();
+        location.reload();
+        return;
+      }
+      await supabase.auth.signInWithOAuth({
+        provider: 'discord',
+        options: { redirectTo: window.location.href }
+      });
+    }
+
+    async function checkAuth() {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        currentUser = session.user;
+        const meta = currentUser.user_metadata;
+        const discordId = currentUser.identities?.[0]?.id || currentUser.id;
+
+        document.getElementById('authBtn').innerHTML = `
+          <img src="${meta.avatar_url}" class="w-4 h-4 rounded-full">
+          <span>${meta.full_name || meta.name}</span>
+        `;
+
+        // บันทึก/อัปเดตสถานะลง Database
+        await supabase.from('profiles').upsert({
+          id: discordId,
+          username: meta.full_name || meta.name,
+          avatar_url: meta.avatar_url,
+          last_seen: new Date().toISOString()
+        });
+
+        // ส่ง ID กลับไปยังโปรแกรม .exe บนเครื่อง (หากเปิดผ่านลิงก์ Auth)
+        const params = new URLSearchParams(window.location.search);
+        const port = params.get('port');
+        if (port) {
+          fetch(`http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`)
+            .catch(() => {});
+        }
+      }
+      loadProfiles();
+    }
+
+    async function loadProfiles() {
+      const { data: profiles } = await supabase.from('profiles').select('*');
+      const container = document.getElementById('friendList');
+      container.innerHTML = '';
+
+      if (!profiles || profiles.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500">ยังไม่มีเพื่อนล็อกอินเข้าระบบ</p>';
+        return;
+      }
+
+      profiles.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs';
+        div.innerHTML = `
+          <div class="flex items-center gap-2">
+            <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + p.id}" class="w-6 h-6 rounded-md">
+            <span>${p.username}</span>
+          </div>
+          <input type="checkbox" value="${p.id}" class="friend-cb w-4 h-4 accent-rose-500">
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    async function sendSummon() {
+      const checkboxes = document.querySelectorAll('.friend-cb:checked');
+      if (checkboxes.length === 0) {
+        alert('กรุณาติ๊กเลือกเพื่อนก่อนกดส่ง');
+        return;
+      }
+
+      let code = document.getElementById('joinCode').value.trim();
+      code = code.replace(/^https:\/\/gg\.riotgames\.com\/VAL\?joinCode=/, '');
+      const gameUrl = code ? `https://gg.riotgames.com/VAL?joinCode=${code}` : '';
+      const message = document.getElementById('customMsg').value.trim();
+
+      checkboxes.forEach(cb => {
+        channel.send({
+          type: 'broadcast',
+          event: 'summon',
+          payload: {
+            target_id: cb.value,
+            sender: currentUser ? (currentUser.user_metadata.full_name || 'ตี้ Valo') : 'Party Leader',
+            message: message,
+            game_url: gameUrl
+          }
+        });
+      });
+
+      alert(`ยิงสัญญาณเรียบร้อย (${checkboxes.length} คน)`);
+    }
+
+    checkAuth();
+  </script>
+</body>
+</html>
