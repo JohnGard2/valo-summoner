@@ -48,11 +48,18 @@
 
   input:focus{ outline:none; }
   ::selection{ background:var(--red); color:var(--void); }
+
+  /* Toast Animation */
+  @keyframes slideIn {
+    from { transform: translateY(100%) scale(0.95); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+  .toast-enter { animation: slideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
 </style>
 </head>
 <body class="text-[color:var(--bone)] min-h-screen">
 
-  <div class="grid-bg min-h-screen">
+  <div class="grid-bg min-h-screen relative">
   <div class="max-w-2xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
 
     <!-- Header -->
@@ -139,6 +146,9 @@
   </div>
   </div>
 
+  <!-- Toast Notification Container (มุมล่างขวา) -->
+  <div id="toastContainer" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 max-w-sm w-full pointer-events-none px-4 sm:px-0"></div>
+
   <!-- Nickname Modal -->
   <div id="nickModal" class="fixed inset-0 bg-[color:var(--void)]/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-[color:var(--panel)] border border-[color:var(--line)] p-6 max-w-sm w-full space-y-4">
@@ -164,6 +174,31 @@
     let onlinePresenceMap = new Map();
     let selectedMemberIds = new Set();
     let presets = [];
+
+    // UI Toast System
+    function showToast(message, type = 'info') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      
+      const borderColor = type === 'success' ? 'var(--online)' : (type === 'error' ? 'var(--red)' : 'var(--line)');
+      const icon = type === 'success' ? '⚡' : (type === 'error' ? '⚠️' : '📡');
+
+      toast.className = 'toast-enter notch-sm pointer-events-auto bg-[color:var(--panel)] border p-3.5 shadow-2xl flex items-center gap-3 transition-all';
+      toast.style.borderColor = borderColor;
+
+      toast.innerHTML = `
+        <span class="text-sm shrink-0">${icon}</span>
+        <div class="font-mono text-[12px] text-[color:var(--bone)] leading-tight">${message}</div>
+      `;
+
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        setTimeout(() => toast.remove(), 300);
+      }, 3200);
+    }
 
     window.addEventListener('DOMContentLoaded', async () => {
       if (!window.supabase) return;
@@ -209,7 +244,7 @@
         const discordId = currentUser.identities?.[0]?.id || currentUser.id;
 
         document.getElementById('authBtn').innerHTML = `
-          <img src="${meta.avatar_url}" class="w-4 h-4">
+          <img src="${meta.avatar_url}" class="w-4 h-4 rounded-full">
           <span>${meta.full_name || meta.name}</span>
         `;
         document.getElementById('editNickBtn').classList.remove('hidden');
@@ -221,11 +256,9 @@
           last_seen: new Date().toISOString()
         });
 
-        // ส่ง ID กลับไปที่ .exe ผ่าน Top-level Redirect (ไม่โดนบล็อก Mixed content)
         const port = new URLSearchParams(window.location.search).get('port');
         if (port) {
           window.location.href = `http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`;
-          return;
         }
       }
     }
@@ -271,7 +304,7 @@
 
         const row = document.createElement('div');
         row.onclick = () => toggleFriend(p.id);
-        row.className = `flex items-center justify-between py-3.5 px-2 cursor-pointer select-none transition-colors ${
+        row.className = `flex items-center justify-between py-3 px-2 cursor-pointer select-none transition-colors ${
           isSelected ? 'bg-[color:var(--red-dim)]' : 'hover:bg-[color:var(--line-soft)]'
         }`;
 
@@ -280,18 +313,18 @@
         row.innerHTML = `
           <div class="flex items-center gap-3 min-w-0">
             <div class="relative shrink-0">
-              <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + p.id}" class="w-8 h-8 object-cover transition ${isOnline ? '' : 'grayscale opacity-50'}">
+              <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + p.id}" class="w-8 h-8 object-cover rounded transition ${isOnline ? '' : 'grayscale opacity-40'}">
               <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[color:var(--void)] ${isOnline ? 'bg-[color:var(--online)] dot-online' : 'bg-[color:var(--steel)]'}"></span>
             </div>
             <div class="min-w-0">
               <div class="text-[13px] text-[color:var(--bone)] font-medium truncate">${displayName}</div>
               <div class="flex items-center gap-2 mt-0.5">
-                <span class="text-[10px] font-mono uppercase tracking-wide ${isOnline ? 'text-[color:var(--online)]' : 'text-[color:var(--steel)]'}">
-                  ${isOnline ? 'Online · .exe' : 'Offline'}
+                <span class="text-[10px] font-mono uppercase tracking-wide font-semibold ${isOnline ? 'text-[color:var(--online)]' : 'text-[color:var(--steel)]'}">
+                  ${isOnline ? 'ONLINE' : 'OFFLINE'}
                 </span>
                 ${isOnline ? `
-                  <span class="text-[10px] font-mono uppercase tracking-wide ${allowAutoOpen ? 'text-[color:var(--red)]' : 'text-[color:var(--steel)]'}">
-                    · Auto ${allowAutoOpen ? 'On' : 'Off'}
+                  <span class="text-[10px] font-mono uppercase tracking-wide ${allowAutoOpen ? 'text-[color:var(--red)] font-semibold' : 'text-[color:var(--steel)]'}">
+                    · FORCE LAUNCH : ${allowAutoOpen ? 'ON' : 'OFF'}
                   </span>
                 ` : ''}
               </div>
@@ -323,6 +356,7 @@
         if (onlinePresenceMap.has(p.id)) selectedMemberIds.add(p.id);
       });
       renderFriendsGrid();
+      showToast(`เลือกคน Online ทั้งหมด (${selectedMemberIds.size} คน)`);
     }
 
     function clearSelection() {
@@ -357,7 +391,7 @@
 
     function saveCurrentPreset() {
       if (selectedMemberIds.size === 0) {
-        alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คนก่อนบันทึกเซ็ต');
+        showToast('กรุณาเลือกเพื่อนอย่างน้อย 1 คนก่อนบันทึกเซ็ต', 'error');
         return;
       }
       const name = prompt('ตั้งชื่อเซ็ตปาร์ตี้นี้:');
@@ -369,6 +403,7 @@
       });
       localStorage.setItem('valo_presets', JSON.stringify(presets));
       renderPresets();
+      showToast(`บันทึกเซ็ต "${name}" เรียบร้อยแล้ว`, 'success');
     }
 
     function applyPreset(index) {
@@ -376,12 +411,14 @@
       if (!preset) return;
       selectedMemberIds = new Set(preset.memberIds);
       renderFriendsGrid();
+      showToast(`โหลดเซ็ต: ${preset.name} (${selectedMemberIds.size} คน)`);
     }
 
     function deletePreset(index) {
       presets.splice(index, 1);
       localStorage.setItem('valo_presets', JSON.stringify(presets));
       renderPresets();
+      showToast('ลบเซ็ตเรียบร้อยแล้ว');
     }
 
     function openNickModal() {
@@ -402,11 +439,12 @@
       await sbClient.from('profiles').update({ nickname: nick }).eq('id', discordId);
       closeNickModal();
       await loadProfiles();
+      showToast(`อัปเดตชื่อเล่นเป็น "${nick}" สำเร็จ`, 'success');
     }
 
     async function sendSummon() {
       if (selectedMemberIds.size === 0) {
-        alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คน');
+        showToast('กรุณาเลือกเป้าหมายอย่างน้อย 1 คน', 'error');
         return;
       }
 
@@ -428,7 +466,7 @@
         });
       });
 
-      alert(`ยิงสัญญาณเรียกเพื่อนสำเร็จ (${selectedMemberIds.size} คน)`);
+      showToast(`ยิงสัญญาณเรียกเพื่อนสำเร็จ (${selectedMemberIds.size} เครื่อง)`, 'success');
     }
   </script>
 </body>
