@@ -26,7 +26,6 @@
   .font-display{ font-family:'Oswald', sans-serif; }
   .font-mono{ font-family:'JetBrains Mono', monospace; }
 
-  /* signature notch — single sharp cut, used only on the identity mark and the primary action */
   .notch{
     clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
   }
@@ -34,7 +33,6 @@
     clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
   }
 
-  /* faint tactical grid, kept at near-invisible opacity so it reads as texture, not decoration */
   .grid-bg{
     background-image:
       linear-gradient(to right, rgba(236,232,225,0.025) 1px, transparent 1px),
@@ -69,7 +67,12 @@
         </div>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2 flex-wrap">
+        <!-- ปุ่มโหลดโปรแกรม .exe โดยตรง -->
+        <a href="https://github.com/johngard2/valo-summoner/releases/latest" target="_blank" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--online)] border border-[color:var(--online)]/40 hover:bg-[color:var(--online)]/10 px-3 py-2 transition flex items-center gap-1.5">
+          <span>⬇️ โหลด Client (.exe)</span>
+        </a>
+
         <button id="editNickBtn" onclick="openNickModal()" class="hidden text-[11px] font-mono uppercase tracking-wide text-[color:var(--steel)] hover:text-[color:var(--bone)] border border-[color:var(--line)] hover:border-[color:var(--steel)] px-3 py-2 transition">
           ตั้งชื่อเล่น
         </button>
@@ -113,7 +116,7 @@
       </div>
     </section>
 
-    <!-- Summon panel (signature) -->
+    <!-- Summon panel -->
     <section class="notch border border-[color:var(--line)] bg-[color:var(--panel)] p-6 sm:p-8">
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-7">
         <div>
@@ -151,19 +154,15 @@
   </div>
 
   <script>
-    // -------------------------------------------------------------
-    // Supabase Configuration
-    // -------------------------------------------------------------
     const SUPABASE_URL = "https://qjwujhoobdneahxrpexb.supabase.co";
     const SUPABASE_KEY = "sb_publishable_Ik19jiEPLwHgd_gnuVP-fw_LwnkUrSp";
-    // -------------------------------------------------------------
 
     let sbClient = null;
     let currentUser = null;
     let summonChannel = null;
 
     let profiles = [];
-    let onlinePresenceMap = new Map(); // discord_id -> { isOnline: true, allowAutoOpen: bool }
+    let onlinePresenceMap = new Map();
     let selectedMemberIds = new Set();
     let presets = [];
 
@@ -177,7 +176,6 @@
       await loadProfiles();
     });
 
-    // 1. ระบบ Presence และ Channel สื่อสาร
     function initPresenceAndRealtime() {
       summonChannel = sbClient.channel('room:summon', {
         config: { presence: { key: currentUser?.id || 'web-guest' } }
@@ -188,7 +186,6 @@
           const state = summonChannel.presenceState();
           onlinePresenceMap.clear();
 
-          // วนลูปอ่านข้อมูลเครื่องที่รัน .exe อยู่จริง
           Object.values(state).forEach(presences => {
             presences.forEach(p => {
               if (p.discord_id) {
@@ -205,7 +202,6 @@
         .subscribe();
     }
 
-    // 2. ตรวจสอบการยืนยันตัวตน Discord
     async function checkAuth() {
       const { data: { session } } = await sbClient.auth.getSession();
       if (session?.user) {
@@ -214,12 +210,11 @@
         const discordId = currentUser.identities?.[0]?.id || currentUser.id;
 
         document.getElementById('authBtn').innerHTML = `
-          <img src="${meta.avatar_url}" class="w-4 h-4">
+          <img src="${meta.avatar_url}" class="w-4 h-4 rounded-full">
           <span>${meta.full_name || meta.name}</span>
         `;
         document.getElementById('editNickBtn').classList.remove('hidden');
 
-        // บันทึกโปรไฟล์เริ่มต้นลงฐานข้อมูล
         await sbClient.from('profiles').upsert({
           id: discordId,
           username: meta.full_name || meta.name,
@@ -227,7 +222,6 @@
           last_seen: new Date().toISOString()
         });
 
-        // ส่ง ID กลับโปรแกรม .exe หากถูกเรียกผ่าน Deep link / Local port
         const port = new URLSearchParams(window.location.search).get('port');
         if (port) {
           fetch(`http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`).catch(() => {});
@@ -247,13 +241,11 @@
       });
     }
 
-    // 3. โหลดและแสดงรายชื่อเพื่อน
     async function loadProfiles() {
       const { data, error } = await sbClient.from('profiles').select('*');
       if (!error && data) {
-        const myId = currentUser ? (currentUser.identities?.[0]?.id || currentUser.id) : null;
-        // ตัดตัวเองออกจากรายชื่อเพื่อน จะได้ไม่ต้องเจอ/เลือกตัวเองในลิสต์
-        profiles = myId ? data.filter(p => p.id !== myId) : data;
+        // แสดงทุกคนในระบบ (รวมถึงตัวเอง) เพื่อการทดสอบ
+        profiles = data;
         renderFriendsGrid();
       }
     }
@@ -338,7 +330,6 @@
       renderFriendsGrid();
     }
 
-    // 4. ระบบจัดการ Party Presets (บันทึกใน localStorage ของใครของมัน)
     function loadPresetsFromStorage() {
       const stored = localStorage.getItem('valo_presets');
       presets = stored ? JSON.parse(stored) : [];
@@ -369,7 +360,7 @@
         alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คนก่อนบันทึกเซ็ต');
         return;
       }
-      const name = prompt('ตั้งชื่อเซ็ตปาร์ตี้นี้ (เช่น ตี้ 5 คนหลัก, ดูโอ้กับเอ):');
+      const name = prompt('ตั้งชื่อเซ็ตปาร์ตี้นี้:');
       if (!name) return;
 
       presets.push({
@@ -393,7 +384,6 @@
       renderPresets();
     }
 
-    // 5. ระบบแก้ไขชื่อเล่น (Nickname)
     function openNickModal() {
       document.getElementById('nickModal').classList.remove('hidden');
       document.getElementById('nickModal').classList.add('flex');
@@ -414,7 +404,6 @@
       await loadProfiles();
     }
 
-    // 6. ยิงสัญญาณคำสั่งเข้า Realtime Broadcast
     async function sendSummon() {
       if (selectedMemberIds.size === 0) {
         alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คน');
