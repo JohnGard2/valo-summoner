@@ -214,12 +214,12 @@
       summonChannel = sbClient.channel('room:summon', {
         config: { presence: { key: currentUser?.id || 'web-guest' } }
       });
-
+    
       summonChannel
         .on('presence', { event: 'sync' }, () => {
           const state = summonChannel.presenceState();
           onlinePresenceMap.clear();
-
+    
           Object.values(state).forEach(presences => {
             presences.forEach(p => {
               if (p.discord_id) {
@@ -230,8 +230,15 @@
               }
             });
           });
-
+    
           renderFriendsGrid();
+        })
+        // รับสัญญาณปฏิเสธด้วย sender_id
+        .on('broadcast', { event: 'decline' }, ({ payload }) => {
+          const myId = currentUser ? (currentUser.identities?.[0]?.id || currentUser.id) : null;
+          if (!payload.target_id || payload.target_id === myId) {
+            showToast(`❌ ${payload.sender} ปฏิเสธคำเชิญ: "${payload.reason}"`, 'error');
+          }
         })
         .subscribe();
     }
@@ -447,25 +454,29 @@
         showToast('กรุณาเลือกเป้าหมายอย่างน้อย 1 คน', 'error');
         return;
       }
-
+    
       let code = document.getElementById('joinCode').value.trim();
       code = code.replace(/^https:\/\/gg\.riotgames\.com\/VAL\?joinCode=/, '');
       const gameUrl = code ? `https://gg.riotgames.com/VAL?joinCode=${code}` : '';
       const message = document.getElementById('customMsg').value.trim() || 'เรียกเข้าเกม!';
-
+      
+      // ดึง Discord ID ของตัวเองแนบไปด้วย
+      const myId = currentUser ? (currentUser.identities?.[0]?.id || currentUser.id) : 'leader';
+    
       selectedMemberIds.forEach(targetId => {
         summonChannel.send({
           type: 'broadcast',
           event: 'summon',
           payload: {
             target_id: targetId,
+            sender_id: myId,
             sender: currentUser?.user_metadata?.full_name || 'Party Leader',
             message: message,
             game_url: gameUrl
           }
         });
       });
-
+    
       showToast(`ยิงสัญญาณเรียกเพื่อนสำเร็จ (${selectedMemberIds.size} เครื่อง)`, 'success');
     }
   </script>
