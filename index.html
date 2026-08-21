@@ -1,162 +1,444 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Valo Summoner</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Valo Summon</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0B0F12;
+    --panel:#14191C;
+    --line:#262C30;
+    --line-soft:#1C2226;
+    --steel:#6E787F;
+    --bone:#ECE8E1;
+    --red:#FF4655;
+    --red-dim:#3A1319;
+    --online:#4CE0B3;
+  }
+  *{ -webkit-tap-highlight-color: transparent; }
+  html,body{ background:var(--void); }
+  body{ font-family:'Inter', sans-serif; }
+  .font-display{ font-family:'Oswald', sans-serif; }
+  .font-mono{ font-family:'JetBrains Mono', monospace; }
+
+  /* signature notch — single sharp cut, used only on the identity mark and the primary action */
+  .notch{
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .notch-sm{
+    clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  }
+
+  /* faint tactical grid, kept at near-invisible opacity so it reads as texture, not decoration */
+  .grid-bg{
+    background-image:
+      linear-gradient(to right, rgba(236,232,225,0.025) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(236,232,225,0.025) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+
+  @keyframes breathe{
+    0%,100%{ opacity:1; }
+    50%{ opacity:0.35; }
+  }
+  .dot-online{ animation: breathe 2.4s ease-in-out infinite; }
+
+  input:focus{ outline:none; }
+  ::selection{ background:var(--red); color:var(--void); }
+</style>
 </head>
-<body class="bg-slate-950 text-slate-100 min-h-screen flex items-center justify-center p-4">
-  <div class="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-2xl">
-    
-    <!-- ส่วนหัวและปุ่มล็อกอิน -->
-    <div class="flex justify-between items-center border-b border-slate-800 pb-4">
-      <div>
-        <h1 class="text-xl font-bold tracking-wider text-rose-500 uppercase">Valo Summoner</h1>
-        <p class="text-xs text-slate-400">ระบบเรียกเพื่อนเข้าห้องตี้</p>
+<body class="text-[color:var(--bone)] min-h-screen">
+
+  <div class="grid-bg min-h-screen">
+  <div class="max-w-2xl mx-auto px-5 sm:px-6 py-10 sm:py-14">
+
+    <!-- Header -->
+    <header class="flex items-start justify-between gap-4 flex-wrap border-b border-[color:var(--line)] pb-7 mb-10">
+      <div class="flex items-center gap-3">
+        <div class="notch w-9 h-9 bg-[color:var(--red)] flex items-center justify-center shrink-0">
+          <span class="font-display font-bold text-[13px] text-[color:var(--void)]">VS</span>
+        </div>
+        <div>
+          <h1 class="font-display font-semibold uppercase tracking-[0.18em] text-[15px] leading-none">Valo Summon</h1>
+          <p class="text-[11px] font-mono text-[color:var(--steel)] mt-1.5 tracking-wide">READY-UP CONSOLE · เรียกตี้เพื่อนแบบเจาะจง</p>
+        </div>
       </div>
-      <button id="authBtn" onclick="handleAuth()" class="flex items-center gap-2 text-xs bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl border border-slate-700 transition">
-        <span>🔑 ล็อกอิน Discord</span>
+
+      <div class="flex items-center gap-2">
+        <button id="editNickBtn" onclick="openNickModal()" class="hidden text-[11px] font-mono uppercase tracking-wide text-[color:var(--steel)] hover:text-[color:var(--bone)] border border-[color:var(--line)] hover:border-[color:var(--steel)] px-3 py-2 transition">
+          ตั้งชื่อเล่น
+        </button>
+        <button id="authBtn" onclick="handleAuth()" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--bone)] border border-[color:var(--line)] hover:border-[color:var(--red)] px-4 py-2 transition flex items-center gap-2">
+          เข้าสู่ระบบด้วย Discord
+        </button>
+      </div>
+    </header>
+
+    <!-- Presets -->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-3.5">
+        <span class="font-display font-semibold uppercase tracking-[0.18em] text-[12px] text-[color:var(--steel)]">Presets</span>
+        <button onclick="saveCurrentPreset()" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--red)] hover:text-[color:var(--bone)] transition">
+          + บันทึกเซ็ตปัจจุบัน
+        </button>
+      </div>
+      <div id="presetsList" class="flex flex-wrap gap-2">
+        <span class="text-[12px] text-[color:var(--steel)] italic">ยังไม่มีเซ็ตที่บันทึกไว้ — ติ๊กเลือกเพื่อนแล้วกดบันทึกได้เลย</span>
+      </div>
+    </section>
+
+    <!-- Squad -->
+    <section class="mb-10">
+      <div class="flex items-center justify-between mb-3.5">
+        <div class="flex items-baseline gap-2.5">
+          <h2 class="font-display font-semibold uppercase tracking-[0.18em] text-[12px] text-[color:var(--steel)]">Squad</h2>
+          <span id="onlineCountBadge" class="font-mono text-[11px] text-[color:var(--steel)]">Online: 0</span>
+        </div>
+        <div class="flex items-center gap-2.5 text-[11px] font-mono uppercase tracking-wide">
+          <button onclick="selectAllOnline()" class="text-[color:var(--steel)] hover:text-[color:var(--bone)] transition">เลือกคน online</button>
+          <span class="text-[color:var(--line)]">/</span>
+          <button onclick="clearSelection()" class="text-[color:var(--steel)] hover:text-[color:var(--bone)] transition">ล้าง</button>
+        </div>
+      </div>
+
+      <div id="friendsGrid" class="border-y border-[color:var(--line)] divide-y divide-[color:var(--line)]">
+        <div class="py-10 text-center text-[11px] font-mono text-[color:var(--steel)] tracking-wide">
+          กำลังโหลดรายชื่อเพื่อนและสถานะโปรแกรม...
+        </div>
+      </div>
+    </section>
+
+    <!-- Summon panel (signature) -->
+    <section class="notch border border-[color:var(--line)] bg-[color:var(--panel)] p-6 sm:p-8">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-7">
+        <div>
+          <label class="block text-[10px] font-mono uppercase tracking-[0.15em] text-[color:var(--steel)] mb-2.5">ข้อความแจ้งเตือน</label>
+          <input id="customMsg" type="text" value="ลงแรงค์ด่วน ขาด 1 คน!"
+            class="w-full bg-transparent border-b border-[color:var(--line)] focus:border-[color:var(--red)] py-2 text-[14px] text-[color:var(--bone)] transition">
+        </div>
+        <div>
+          <label class="block text-[10px] font-mono uppercase tracking-[0.15em] text-[color:var(--steel)] mb-2.5">Valorant Join Code / URL</label>
+          <input id="joinCode" type="text" placeholder="YHDZ-vvd6-0z2s"
+            class="w-full bg-transparent border-b border-[color:var(--line)] focus:border-[color:var(--red)] py-2 text-[14px] font-mono text-[color:var(--bone)] placeholder:text-[color:var(--steel)] transition">
+        </div>
+      </div>
+
+      <button id="sendBtn" onclick="sendSummon()" class="notch-sm w-full py-4 bg-[color:var(--red)] hover:brightness-110 active:scale-[0.99] transition flex items-center justify-center gap-3">
+        <span class="font-display font-semibold uppercase tracking-[0.2em] text-[13px] text-[color:var(--void)]">Ready Up · ยิงสัญญาณ</span>
+        <span id="selectedCountBadge" class="font-mono text-[11px] text-[color:var(--void)]/70">0 คน</span>
       </button>
-    </div>
+    </section>
 
-    <!-- รายชื่อเพื่อน -->
-    <div>
-      <div class="flex justify-between items-center mb-2">
-        <label class="text-xs font-semibold uppercase text-slate-400">เลือกเพื่อนที่ต้องการเรียก</label>
-        <button onclick="loadProfiles()" class="text-xs text-rose-400 hover:underline">รีเฟรช</button>
-      </div>
-      <div id="friendList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
-        <p class="text-xs text-slate-500">กำลังโหลดรายชื่อ...</p>
-      </div>
-    </div>
+  </div>
+  </div>
 
-    <!-- กล่องกรอกข้อมูล -->
-    <div class="space-y-3">
-      <div>
-        <label class="block text-xs text-slate-400 mb-1">ข้อความแจ้งเตือน</label>
-        <input id="customMsg" type="text" value="ลงแรงค์ด่วน ขาด 1 คน!" placeholder="ข้อความแจ้งเตือน" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-slate-200 focus:border-rose-500 outline-none">
-      </div>
-      <div>
-        <label class="block text-xs text-slate-400 mb-1">Join Code หรือ ลิงก์ห้อง Valorant</label>
-        <input id="joinCode" type="text" placeholder="เช่น YHDZ-vvd6-0z2s หรือ วางลิงก์เต็ม" 
-          class="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm font-mono text-slate-200 focus:border-rose-500 outline-none">
+  <!-- Nickname Edit Modal -->
+  <div id="nickModal" class="fixed inset-0 bg-[color:var(--void)]/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
+    <div class="bg-[color:var(--panel)] border border-[color:var(--line)] p-6 max-w-sm w-full space-y-4">
+      <h3 class="font-display font-semibold uppercase tracking-[0.1em] text-[13px] text-[color:var(--bone)]">ตั้งชื่อเล่น (แสดงในระบบ)</h3>
+      <input id="nicknameInput" type="text" placeholder="ระบุชื่อเล่นที่เพื่อนจำได้ง่าย"
+        class="w-full bg-transparent border-b border-[color:var(--line)] focus:border-[color:var(--red)] py-2 text-[14px] text-[color:var(--bone)] transition">
+      <div class="flex justify-end gap-4 pt-1">
+        <button onclick="closeNickModal()" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--steel)] hover:text-[color:var(--bone)] transition">ยกเลิก</button>
+        <button onclick="saveNickname()" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--red)] hover:text-[color:var(--bone)] transition">บันทึก</button>
       </div>
     </div>
-
-    <!-- ปุ่มยิงสัญญาณ -->
-    <button onclick="sendSummon()" class="w-full py-3 bg-rose-600 hover:bg-rose-500 active:scale-[0.99] text-white font-bold rounded-xl text-sm transition shadow-lg shadow-rose-950">
-      ยิงสัญญาณเรียกเพื่อน
-    </button>
   </div>
 
   <script>
+    // -------------------------------------------------------------
+    // Supabase Configuration
+    // -------------------------------------------------------------
     const SUPABASE_URL = "https://qjwujhoobdneahxrpexb.supabase.co";
-    const SUPABASE_KEY = "sb_publishable_Ik19jiEPLwHgd_gnuVP-fw_LwnkUrSp"; // <<-- นำ Anon Key จาก Supabase มาใส่ตรงนี้
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const SUPABASE_KEY = "sb_publishable_Ik19jiEPLwHgd_gnuVP-fw_LwnkUrSp";
+    // -------------------------------------------------------------
 
+    let sbClient = null;
     let currentUser = null;
-    const channel = supabase.channel('room:summon');
-    channel.subscribe();
+    let summonChannel = null;
 
-    async function handleAuth() {
-      if (currentUser) {
-        await supabase.auth.signOut();
-        location.reload();
-        return;
-      }
-      await supabase.auth.signInWithOAuth({
-        provider: 'discord',
-        options: { redirectTo: window.location.href }
+    let profiles = [];
+    let onlinePresenceMap = new Map(); // discord_id -> { isOnline: true, allowAutoOpen: bool }
+    let selectedMemberIds = new Set();
+    let presets = [];
+
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!window.supabase) return;
+      sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+      loadPresetsFromStorage();
+      initPresenceAndRealtime();
+      await checkAuth();
+      await loadProfiles();
+    });
+
+    // 1. ระบบ Presence และ Channel สื่อสาร
+    function initPresenceAndRealtime() {
+      summonChannel = sbClient.channel('room:summon', {
+        config: { presence: { key: currentUser?.id || 'web-guest' } }
       });
+
+      summonChannel
+        .on('presence', { event: 'sync' }, () => {
+          const state = summonChannel.presenceState();
+          onlinePresenceMap.clear();
+
+          // วนลูปอ่านข้อมูลเครื่องที่รัน .exe อยู่จริง
+          Object.values(state).forEach(presences => {
+            presences.forEach(p => {
+              if (p.discord_id) {
+                onlinePresenceMap.set(p.discord_id, {
+                  isOnline: true,
+                  allowAutoOpen: p.allow_auto_open ?? true
+                });
+              }
+            });
+          });
+
+          renderFriendsGrid();
+        })
+        .subscribe();
     }
 
+    // 2. ตรวจสอบการยืนยันตัวตน Discord
     async function checkAuth() {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session } } = await sbClient.auth.getSession();
       if (session?.user) {
         currentUser = session.user;
         const meta = currentUser.user_metadata;
         const discordId = currentUser.identities?.[0]?.id || currentUser.id;
 
         document.getElementById('authBtn').innerHTML = `
-          <img src="${meta.avatar_url}" class="w-4 h-4 rounded-full">
+          <img src="${meta.avatar_url}" class="w-4 h-4">
           <span>${meta.full_name || meta.name}</span>
         `;
+        document.getElementById('editNickBtn').classList.remove('hidden');
 
-        // บันทึก/อัปเดตสถานะลง Database
-        await supabase.from('profiles').upsert({
+        // บันทึกโปรไฟล์เริ่มต้นลงฐานข้อมูล
+        await sbClient.from('profiles').upsert({
           id: discordId,
           username: meta.full_name || meta.name,
           avatar_url: meta.avatar_url,
           last_seen: new Date().toISOString()
         });
 
-        // ส่ง ID กลับไปยังโปรแกรม .exe บนเครื่อง (หากเปิดผ่านลิงก์ Auth)
-        const params = new URLSearchParams(window.location.search);
-        const port = params.get('port');
+        // ส่ง ID กลับโปรแกรม .exe หากถูกเรียกผ่าน Deep link / Local port
+        const port = new URLSearchParams(window.location.search).get('port');
         if (port) {
-          fetch(`http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`)
-            .catch(() => {});
+          fetch(`http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`).catch(() => {});
         }
       }
-      loadProfiles();
     }
 
+    async function handleAuth() {
+      if (currentUser) {
+        await sbClient.auth.signOut();
+        location.reload();
+        return;
+      }
+      await sbClient.auth.signInWithOAuth({
+        provider: 'discord',
+        options: { redirectTo: window.location.origin + window.location.pathname }
+      });
+    }
+
+    // 3. โหลดและแสดงรายชื่อเพื่อน
     async function loadProfiles() {
-      const { data: profiles } = await supabase.from('profiles').select('*');
-      const container = document.getElementById('friendList');
+      const { data, error } = await sbClient.from('profiles').select('*');
+      if (!error && data) {
+        profiles = data;
+        renderFriendsGrid();
+      }
+    }
+
+    function renderFriendsGrid() {
+      const container = document.getElementById('friendsGrid');
       container.innerHTML = '';
 
-      if (!profiles || profiles.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-500">ยังไม่มีเพื่อนล็อกอินเข้าระบบ</p>';
+      let onlineCount = 0;
+
+      if (profiles.length === 0) {
+        container.innerHTML = '<div class="py-8 text-center text-[11px] font-mono text-[color:var(--steel)] tracking-wide">ยังไม่มีข้อมูลเพื่อนในระบบ</div>';
         return;
       }
 
       profiles.forEach(p => {
-        const div = document.createElement('div');
-        div.className = 'flex items-center justify-between p-2 rounded-xl bg-slate-950 border border-slate-800 text-xs';
-        div.innerHTML = `
-          <div class="flex items-center gap-2">
-            <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + p.id}" class="w-6 h-6 rounded-md">
-            <span>${p.username}</span>
+        const presence = onlinePresenceMap.get(p.id);
+        const isOnline = !!presence;
+        const allowAutoOpen = presence ? presence.allowAutoOpen : (p.allow_auto_open ?? true);
+        const isSelected = selectedMemberIds.has(p.id);
+
+        if (isOnline) onlineCount++;
+
+        const row = document.createElement('div');
+        row.onclick = () => toggleFriend(p.id);
+        row.className = `flex items-center justify-between py-3.5 px-2 cursor-pointer select-none transition-colors ${
+          isSelected ? 'bg-[color:var(--red-dim)]' : 'hover:bg-[color:var(--line-soft)]'
+        }`;
+
+        const displayName = p.nickname ? `${p.nickname} (${p.username})` : p.username;
+
+        row.innerHTML = `
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="relative shrink-0">
+              <img src="${p.avatar_url || 'https://api.dicebear.com/7.x/bottts/svg?seed=' + p.id}" class="w-8 h-8 object-cover transition ${isOnline ? '' : 'grayscale opacity-50'}">
+              <span class="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[color:var(--void)] ${isOnline ? 'bg-[color:var(--online)] dot-online' : 'bg-[color:var(--steel)]'}"></span>
+            </div>
+            <div class="min-w-0">
+              <div class="text-[13px] text-[color:var(--bone)] font-medium truncate">${displayName}</div>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-[10px] font-mono uppercase tracking-wide ${isOnline ? 'text-[color:var(--online)]' : 'text-[color:var(--steel)]'}">
+                  ${isOnline ? 'Online · .exe' : 'Offline'}
+                </span>
+                ${isOnline ? `
+                  <span class="text-[10px] font-mono uppercase tracking-wide ${allowAutoOpen ? 'text-[color:var(--red)]' : 'text-[color:var(--steel)]'}">
+                    · Auto ${allowAutoOpen ? 'On' : 'Off'}
+                  </span>
+                ` : ''}
+              </div>
+            </div>
           </div>
-          <input type="checkbox" value="${p.id}" class="friend-cb w-4 h-4 accent-rose-500">
+          <div class="w-4 h-4 border shrink-0 ml-3 flex items-center justify-center ${isSelected ? 'bg-[color:var(--red)] border-[color:var(--red)]' : 'border-[color:var(--line)]'}">
+            ${isSelected ? '<span class="text-[color:var(--void)] text-[10px] font-bold">✓</span>' : ''}
+          </div>
         `;
-        container.appendChild(div);
+        container.appendChild(row);
+      });
+
+      document.getElementById('onlineCountBadge').innerText = `Online: ${onlineCount}/${profiles.length}`;
+      document.getElementById('selectedCountBadge').innerText = `${selectedMemberIds.size} คน`;
+    }
+
+    function toggleFriend(id) {
+      if (selectedMemberIds.has(id)) {
+        selectedMemberIds.delete(id);
+      } else {
+        selectedMemberIds.add(id);
+      }
+      renderFriendsGrid();
+    }
+
+    function selectAllOnline() {
+      selectedMemberIds.clear();
+      profiles.forEach(p => {
+        if (onlinePresenceMap.has(p.id)) selectedMemberIds.add(p.id);
+      });
+      renderFriendsGrid();
+    }
+
+    function clearSelection() {
+      selectedMemberIds.clear();
+      renderFriendsGrid();
+    }
+
+    // 4. ระบบจัดการ Party Presets (บันทึกใน localStorage ของใครของมัน)
+    function loadPresetsFromStorage() {
+      const stored = localStorage.getItem('valo_presets');
+      presets = stored ? JSON.parse(stored) : [];
+      renderPresets();
+    }
+
+    function renderPresets() {
+      const container = document.getElementById('presetsList');
+      if (presets.length === 0) {
+        container.innerHTML = '<span class="text-[12px] text-[color:var(--steel)] italic">ยังไม่มีเซ็ตที่บันทึกไว้</span>';
+        return;
+      }
+
+      container.innerHTML = '';
+      presets.forEach((preset, index) => {
+        const chip = document.createElement('div');
+        chip.className = 'flex items-center gap-2 border border-[color:var(--line)] hover:border-[color:var(--red)] px-3 py-1.5 text-[11px] font-mono uppercase tracking-wide text-[color:var(--steel)] hover:text-[color:var(--bone)] transition cursor-pointer';
+        chip.innerHTML = `
+          <span onclick="applyPreset(${index})">${preset.name} · ${preset.memberIds.length}</span>
+          <button onclick="deletePreset(${index})" class="hover:text-[color:var(--red)]">✕</button>
+        `;
+        container.appendChild(chip);
       });
     }
 
+    function saveCurrentPreset() {
+      if (selectedMemberIds.size === 0) {
+        alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คนก่อนบันทึกเซ็ต');
+        return;
+      }
+      const name = prompt('ตั้งชื่อเซ็ตปาร์ตี้นี้ (เช่น ตี้ 5 คนหลัก, ดูโอ้กับเอ):');
+      if (!name) return;
+
+      presets.push({
+        name: name.trim(),
+        memberIds: Array.from(selectedMemberIds)
+      });
+      localStorage.setItem('valo_presets', JSON.stringify(presets));
+      renderPresets();
+    }
+
+    function applyPreset(index) {
+      const preset = presets[index];
+      if (!preset) return;
+      selectedMemberIds = new Set(preset.memberIds);
+      renderFriendsGrid();
+    }
+
+    function deletePreset(index) {
+      presets.splice(index, 1);
+      localStorage.setItem('valo_presets', JSON.stringify(presets));
+      renderPresets();
+    }
+
+    // 5. ระบบแก้ไขชื่อเล่น (Nickname)
+    function openNickModal() {
+      document.getElementById('nickModal').classList.remove('hidden');
+      document.getElementById('nickModal').classList.add('flex');
+    }
+
+    function closeNickModal() {
+      document.getElementById('nickModal').classList.add('hidden');
+      document.getElementById('nickModal').classList.remove('flex');
+    }
+
+    async function saveNickname() {
+      const nick = document.getElementById('nicknameInput').value.trim();
+      if (!currentUser || !nick) return;
+
+      const discordId = currentUser.identities?.[0]?.id || currentUser.id;
+      await sbClient.from('profiles').update({ nickname: nick }).eq('id', discordId);
+      closeNickModal();
+      await loadProfiles();
+    }
+
+    // 6. ยิงสัญญาณคำสั่งเข้า Realtime Broadcast
     async function sendSummon() {
-      const checkboxes = document.querySelectorAll('.friend-cb:checked');
-      if (checkboxes.length === 0) {
-        alert('กรุณาติ๊กเลือกเพื่อนก่อนกดส่ง');
+      if (selectedMemberIds.size === 0) {
+        alert('กรุณาเลือกเพื่อนอย่างน้อย 1 คน');
         return;
       }
 
       let code = document.getElementById('joinCode').value.trim();
       code = code.replace(/^https:\/\/gg\.riotgames\.com\/VAL\?joinCode=/, '');
       const gameUrl = code ? `https://gg.riotgames.com/VAL?joinCode=${code}` : '';
-      const message = document.getElementById('customMsg').value.trim();
+      const message = document.getElementById('customMsg').value.trim() || 'เรียกเข้าเกม!';
 
-      checkboxes.forEach(cb => {
-        channel.send({
+      selectedMemberIds.forEach(targetId => {
+        summonChannel.send({
           type: 'broadcast',
           event: 'summon',
           payload: {
-            target_id: cb.value,
-            sender: currentUser ? (currentUser.user_metadata.full_name || 'ตี้ Valo') : 'Party Leader',
+            target_id: targetId,
+            sender: currentUser?.user_metadata?.full_name || 'Party Leader',
             message: message,
             game_url: gameUrl
           }
         });
       });
 
-      alert(`ยิงสัญญาณเรียบร้อย (${checkboxes.length} คน)`);
+      alert(`ยิงสัญญาณเรียกเพื่อนสำเร็จ (${selectedMemberIds.size} คน)`);
     }
-
-    checkAuth();
   </script>
 </body>
 </html>
