@@ -154,7 +154,7 @@
     // -------------------------------------------------------------
     // Supabase Configuration
     // -------------------------------------------------------------
-    const SUPABASE_URL = "https://qjwujhoobdneahxrpexb.supabase.co";
+    const SUPABASE_URL = "qjwujhoobdneahxrpexb.supabase.co";
     const SUPABASE_KEY = "sb_publishable_Ik19jiEPLwHgd_gnuVP-fw_LwnkUrSp";
     // -------------------------------------------------------------
 
@@ -251,7 +251,9 @@
     async function loadProfiles() {
       const { data, error } = await sbClient.from('profiles').select('*');
       if (!error && data) {
-        profiles = data;
+        const myId = currentUser ? (currentUser.identities?.[0]?.id || currentUser.id) : null;
+        // ตัดตัวเองออกจากรายชื่อเพื่อน จะได้ไม่ต้องเจอ/เลือกตัวเองในลิสต์
+        profiles = myId ? data.filter(p => p.id !== myId) : data;
         renderFriendsGrid();
       }
     }
