@@ -68,7 +68,6 @@
       </div>
 
       <div class="flex items-center gap-2 flex-wrap">
-        <!-- ปุ่มโหลดโปรแกรม .exe โดยตรง -->
         <a href="https://github.com/johngard2/valo-summoner/releases/latest" target="_blank" class="text-[11px] font-mono uppercase tracking-wide text-[color:var(--online)] border border-[color:var(--online)]/40 hover:bg-[color:var(--online)]/10 px-3 py-2 transition flex items-center gap-1.5">
           <span>⬇️ โหลด Client (.exe)</span>
         </a>
@@ -140,7 +139,7 @@
   </div>
   </div>
 
-  <!-- Nickname Edit Modal -->
+  <!-- Nickname Modal -->
   <div id="nickModal" class="fixed inset-0 bg-[color:var(--void)]/85 backdrop-blur-sm hidden items-center justify-center p-4 z-50">
     <div class="bg-[color:var(--panel)] border border-[color:var(--line)] p-6 max-w-sm w-full space-y-4">
       <h3 class="font-display font-semibold uppercase tracking-[0.1em] text-[13px] text-[color:var(--bone)]">ตั้งชื่อเล่น (แสดงในระบบ)</h3>
@@ -171,8 +170,8 @@
       sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
       loadPresetsFromStorage();
-      initPresenceAndRealtime();
       await checkAuth();
+      initPresenceAndRealtime();
       await loadProfiles();
     });
 
@@ -210,7 +209,7 @@
         const discordId = currentUser.identities?.[0]?.id || currentUser.id;
 
         document.getElementById('authBtn').innerHTML = `
-          <img src="${meta.avatar_url}" class="w-4 h-4 rounded-full">
+          <img src="${meta.avatar_url}" class="w-4 h-4">
           <span>${meta.full_name || meta.name}</span>
         `;
         document.getElementById('editNickBtn').classList.remove('hidden');
@@ -222,9 +221,11 @@
           last_seen: new Date().toISOString()
         });
 
+        // ส่ง ID กลับไปที่ .exe ผ่าน Top-level Redirect (ไม่โดนบล็อก Mixed content)
         const port = new URLSearchParams(window.location.search).get('port');
         if (port) {
-          fetch(`http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`).catch(() => {});
+          window.location.href = `http://127.0.0.1:${port}/callback?id=${discordId}&name=${encodeURIComponent(meta.full_name || meta.name)}`;
+          return;
         }
       }
     }
@@ -237,14 +238,13 @@
       }
       await sbClient.auth.signInWithOAuth({
         provider: 'discord',
-        options: { redirectTo: window.location.origin + window.location.pathname }
+        options: { redirectTo: window.location.href }
       });
     }
 
     async function loadProfiles() {
       const { data, error } = await sbClient.from('profiles').select('*');
       if (!error && data) {
-        // แสดงทุกคนในระบบ (รวมถึงตัวเอง) เพื่อการทดสอบ
         profiles = data;
         renderFriendsGrid();
       }
